@@ -1,3 +1,5 @@
+using Serilog;
+
 namespace Quartz.Examples.AspNetCore
 {
     public class Program
@@ -9,6 +11,11 @@ namespace Quartz.Examples.AspNetCore
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
+                //.ConfigureServices(services =>
+                //{
+                //    services.
+                //})
+                .UseSerilog()
                 .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>());
     }
 }

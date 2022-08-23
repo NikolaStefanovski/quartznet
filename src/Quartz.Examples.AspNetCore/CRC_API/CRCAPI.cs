@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using Quartz.Examples.AspNetCore.CRC_API.Models;
+using Quartz.Examples.AspNetCore.CRC_API.DTO;
 using RestSharp;
 using System;
+using CRCModels = Quartz.Examples.AspNetCore.CRC_API.DTO;
 
 namespace Quartz.Examples.AspNetCore.CRC_API
 {
@@ -12,40 +13,42 @@ namespace Quartz.Examples.AspNetCore.CRC_API
         private readonly RestClient Client;
         private readonly CRCOptions Options;
 
-        public CRCAPI(CRCOptions options)
+        public CRCAPI(IOptions<CRCOptions> options)
         {
-            Options = options;
+            Options = options.Value;
             if (!string.IsNullOrEmpty(Options.BaseURI))
                 Client = new RestClient(Options.BaseURI);
             else
                 Client = new RestClient("https://crcindustries.em-hosting.be/swagger");
         }
 
-        public Result<Token> Authenticate()
+        public Result<CRCModels.Token> Authenticate()
         {
-            Result<Token> result = new Result<Token>();
+            Result<CRCModels.Token> result = new Result<CRCModels.Token>();
 
             RestRequest request = new RestRequest("/token", Method.Post);
-            request.AddParameter("grant_type", "password");
-            request.AddParameter("username", Options.Username);
-            request.AddParameter("password", Options.Password);
             request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
+            request.AddHeader("Accept", "application/json");
+            //request.AddParameter("grant_type", "password", ParameterType.RequestBody);
+#pragma warning disable CS8604 // Possible null reference argument.
+            //request.AddParameter("username", Options.Username, ParameterType.RequestBody);
+            //request.AddParameter("password", Options.Password, ParameterType.RequestBody);
+#pragma warning restore CS8604 // Possible null reference argument.
+            request.AddParameter("application/x-www-form-urlencoded", $"grant_type=password&username={Options.Username}&password={Options.Password}", ParameterType.RequestBody);
+            //request.MultipartFormQuoteParameters = true;
+            //request.AlwaysMultipartFormData = true;
 
             var response = Client.Execute(request);
-
             if (response == null)
             {
                 result.Error = "Unknown error, authentication response is null";
                 return result;
             }
-
             if (response.ResponseStatus != ResponseStatus.Completed)
             {
                 result.Error = $"Error message: {response.ErrorMessage}";
-
                 if (response.ErrorException != null && !string.IsNullOrEmpty(response.ErrorException.Message))
                     result.Error += $";exception message: {response.ErrorException.Message}";
-
                 return result;
             }
 
@@ -60,7 +63,7 @@ namespace Quartz.Examples.AspNetCore.CRC_API
 
             if (response.ResponseStatus == ResponseStatus.Completed && response.StatusCode == System.Net.HttpStatusCode.OK && !string.IsNullOrEmpty(response.Content))
             {
-                var token = JsonConvert.DeserializeObject<Token>(response.Content);
+                var token = JsonConvert.DeserializeObject<CRCModels.Token>(response.Content);
                 result.Value = token;
             }
 
@@ -141,7 +144,7 @@ namespace Quartz.Examples.AspNetCore.CRC_API
 
             if (requestResult == null)
             {
-                result.Error = "Unknown error, result is null";
+                result.Error = "Unknown error, request result is null";
                 return result;
             }
 
@@ -151,7 +154,40 @@ namespace Quartz.Examples.AspNetCore.CRC_API
                 return result;
             }
 
-            throw new NotImplementedException();
+            if (string.IsNullOrEmpty(requestResult.Error) && requestResult.Value == null)
+            {
+                result.Error = "Unknown error, request result value is null";
+                return result;
+            }
+
+            return requestResult;
+        }
+
+        public Result<IEnumerable<EmployeePresenceDTO>> GetEmployeePresences()
+        {
+            Result<IEnumerable<EmployeePresenceDTO>> result = new Result<IEnumerable<EmployeePresenceDTO>>();
+
+            var requestResult = Execute<IEnumerable<EmployeePresenceDTO>>("/api/public/employee/presence", Method.Get);
+
+            if (requestResult == null)
+            {
+                result.Error = "Unknown error, request result is null";
+                return result;
+            }
+
+            if (!string.IsNullOrEmpty(requestResult.Error))
+            {
+                result.Error = requestResult.Error;
+                return result;
+            }
+
+            if (string.IsNullOrEmpty(requestResult.Error) && requestResult.Value == null)
+            {
+                result.Error = "Unknown error, request result value is null";
+                return result;
+            }
+
+            return requestResult;
         }
     }
 }

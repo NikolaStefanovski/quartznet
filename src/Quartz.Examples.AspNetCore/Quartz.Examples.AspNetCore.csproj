@@ -7,6 +7,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <_ContentIncludedByDefault Remove="efpt.config.json" />
+    </ItemGroup>
+
+    <ItemGroup>
       <ProjectReference Include="..\Quartz.AspNetCore\Quartz.AspNetCore.csproj" />
       <ProjectReference Include="..\Quartz.Plugins.TimeZoneConverter\Quartz.Plugins.TimeZoneConverter.csproj" />
       <ProjectReference Include="..\Quartz.Plugins\Quartz.Plugins.csproj" />
@@ -20,15 +24,23 @@
       <PackageReference Include="AutoMapper" Version="11.0.1" />
       <PackageReference Include="AutoMapper.Collection" Version="8.0.0" />
       <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="11.0.0" />
+      <PackageReference Include="EfCore.SchemaCompare" Version="6.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.8" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.8" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.8">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
       <PackageReference Include="OpenTelemetry.Exporter.Jaeger" Version="1.1.0" />
       <PackageReference Include="OpenTelemetry.Exporter.Zipkin" Version="1.1.0" />
       <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.0.0-rc9" />
       <PackageReference Include="OpenTelemetry.Instrumentation.Quartz" Version="1.0.0-alpha.1" />
       <PackageReference Include="RestSharp" Version="108.0.1" />
+      <PackageReference Include="Serilog.AspNetCore" Version="6.0.1" />
       <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
       <PackageReference Include="Serilog.Sinks.Console" Version="4.0.1" />
+      <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+      <PackageReference Include="SimpleInjector" Version="5.4.0" />
     </ItemGroup>
 
 </Project>

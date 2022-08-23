@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Quartz.Examples.AspNetCore.CRC_API.Models
+namespace Quartz.Examples.AspNetCore.CRC_API.DTO
 {
     public class Token
     {

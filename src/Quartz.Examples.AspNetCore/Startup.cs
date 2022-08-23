@@ -4,10 +4,12 @@ using HealthChecks.UI.Client;
 
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 using OpenTelemetry.Trace;
+using Quartz.Examples.AspNetCore.Database;
 using Quartz.Examples.AspNetCore.CRC_API;
 using Quartz.Examples.AspNetCore.Mappers;
 using Quartz.Impl.Calendar;
@@ -22,12 +24,13 @@ namespace Quartz.Examples.AspNetCore
     {
         public Startup(IConfiguration configuration)
         {
+            Configuration = configuration;
+
             Log.Logger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .WriteTo.Console()
+                //.WriteTo.Console()
+                .ReadFrom.Configuration(Configuration)
                 .CreateLogger();
-
-            Configuration = configuration;
         }
 
         public IConfiguration Configuration { get; }
@@ -36,11 +39,17 @@ namespace Quartz.Examples.AspNetCore
         public void ConfigureServices(IServiceCollection services)
         {
             // make sure you configure logging and open telemetry before quartz services
-
             services.AddLogging(loggingBuilder =>
             {
                 loggingBuilder.ClearProviders();
+
+                //var logger = new LoggerConfiguration()
+                //    .MinimumLevel.Debug()
+                //    .ReadFrom.Configuration(Configuration)
+                //    .CreateLogger();
+
                 loggingBuilder.AddSerilog(dispose: true);
+                //loggingBuilder.AddSerilog(logger);
             });
 
             services.AddOpenTelemetryTracing(builder =>
@@ -63,17 +72,16 @@ namespace Quartz.Examples.AspNetCore
 
             // CRC settings
             services.Configure<CRCOptions>(Configuration.GetSection("CRC"));
-            //services.AddOptions<CRCOptions>().Bind(Configuration.GetSection("CRC"));
-            services.AddSingleton<CRCAPI>(provider =>
-            {
-                return provider.GetRequiredService<CRCAPI>();
-            });
-            services.AddDbContext<DbContext>(options =>
-                options.UseSqlServer(Configuration.GetConnectionString("CRC_DB")
-            ));
-
-            //services.AddAutoMapper(typeof(Startup));
+            services.AddDbContext<CRCTestContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("CRC_DB"))
+            );
+            
+            services.AddSingleton<CRCAPI>();
+            services.AddTransient<CRCJob>();
+            
+            services.AddSingleton<CRCJobFactory>();
             services.AddAutoMapper(mapper => mapper.AddProfile(typeof(EmployeeProfile)));
+            // CRC settings
 
             // base configuration for DI, read from appSettings.json
             services.Configure<QuartzOptions>(Configuration.GetSection("Quartz"));
@@ -97,20 +105,24 @@ namespace Quartz.Examples.AspNetCore
                 q.InterruptJobsOnShutdownWithWait = true;
 
                 // we can change from the default of 1
-                q.MaxBatchSize = 5;
+                q.MaxBatchSize = 10;
 
                 // auto-interrupt long-running job
-                q.UseJobAutoInterrupt(options =>
-                {
-                    // this is the default
-                    options.DefaultMaxRunTime = TimeSpan.FromMinutes(5);
-                });
+                //q.UseJobAutoInterrupt(options =>
+                //{
+                //    // this is the default
+                //    options.DefaultMaxRunTime = TimeSpan.FromMinutes(5);
+                //});
 
                 // we take this from appsettings.json, just show it's possible
                 // q.SchedulerName = "Quartz ASP.NET Core Sample Scheduler";
 
                 // this is default configuration if you don't alter it
-                q.UseMicrosoftDependencyInjectionJobFactory();
+                //q.UseMicrosoftDependencyInjectionJobFactory();
+                q.UseJobFactory<CRCJobFactory>(builder =>
+                {
+                    builder.CreateScope = true;
+                });
 
                 // these are the defaults
                 q.UseSimpleTypeLoader();
@@ -118,79 +130,73 @@ namespace Quartz.Examples.AspNetCore
                 q.UseDefaultThreadPool(maxConcurrency: 10);
 
                 // also add XML configuration and poll it for changes
-                q.UseXmlSchedulingConfiguration(x =>
-                {
-                    x.Files = new[] { "~/quartz_jobs.config" };
-                    x.ScanInterval = TimeSpan.FromMinutes(1);
-                    x.FailOnFileNotFound = true;
-                    x.FailOnSchedulingError = true;
-                });
+                //q.UseXmlSchedulingConfiguration(x =>
+                //{
+                //    x.Files = new[] { "~/quartz_jobs.config" };
+                //    x.ScanInterval = TimeSpan.FromMinutes(1);
+                //    x.FailOnFileNotFound = true;
+                //    x.FailOnSchedulingError = true;
+                //});
 
                 // convert time zones using converter that can handle Windows/Linux differences
                 q.UseTimeZoneConverter();
 
                 // quickest way to create a job with single trigger is to use ScheduleJob
-                q.ScheduleJob<ExampleJob>(trigger => trigger
-                    .WithIdentity("Combined Configuration Trigger")
-                    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(7)))
-                    .WithDailyTimeIntervalSchedule(x => x.WithInterval(10, IntervalUnit.Minute))
-                    .WithDescription("my awesome trigger configured for a job with single call")
-                );
-                q.ScheduleJob<CRCJob>(trigger => trigger
-                    .WithIdentity("CRC single call job")
-                    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(7)))
-                    .StartNow()
-                    //.WithDailyTimeIntervalSchedule(x => x.WithInterval(2, IntervalUnit.Minute))
-                    .WithDescription("CRC single call job")
-                );
+                //q.ScheduleJob<ExampleJob>(trigger => trigger
+                //    .WithIdentity("Combined Configuration Trigger")
+                //    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(7)))
+                //    .WithDailyTimeIntervalSchedule(x => x.WithInterval(10, IntervalUnit.Minute))
+                //    .WithDescription("my awesome trigger configured for a job with single call")
+                //);
+                //q.ScheduleJob<CRCJob>(trigger => trigger
+                //    .WithIdentity("CRC single call trigger")
+                //    //.StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(60)))
+                //    .StartNow()
+                //    //.WithDailyTimeIntervalSchedule(x => x.WithInterval(2, IntervalUnit.Minute))
+                //    .WithSimpleSchedule(x => x.WithInterval(TimeSpan.FromSeconds(10)).RepeatForever())
+                //    .WithDescription("CRC single call trigger")
+                //);
 
                 #region Not needed
                 // you can also configure individual jobs and triggers with code
                 // this allows you to associated multiple triggers with same job
                 // (if you want to have different job data map per trigger for example)
-                q.AddJob<ExampleJob>(j => j
-                    .StoreDurably() // we need to store durably if no trigger is associated
-                    .WithDescription("example job")
-                );
-                q.AddJob<CRCJob>(j => j
-                    .StoreDurably() // we need to store durably if no trigger is associated
-                    .WithDescription("CRC job")
-                );
+                //q.AddJob<ExampleJob>(j => j
+                //    .StoreDurably() // we need to store durably if no trigger is associated
+                //    .WithDescription("example job")
+                //);
+                //q.AddJob<CRCJob>(j => j
+                //    .StoreDurably() // we need to store durably if no trigger is associated
+                //    .WithDescription("CRC job")
+                //);
 
-                //// here's a known job for triggers
-                var jobKey = new JobKey("example job", "test group");
-                var crcJobKey = new JobKey("CRC job", "test group");
-                q.AddJob<ExampleJob>(jobKey, j => j
-                    .WithDescription("example job")
-                );
+                // here's a known job for triggers
+                //var jobKey = new JobKey("example job", "test group");
+                var crcJobKey = new JobKey("CRC job", "CRC group");
+                //q.AddJob<ExampleJob>(jobKey, j => j
+                //    .WithDescription("example job")
+                //);
                 q.AddJob<CRCJob>(crcJobKey, j => j
                     .WithDescription("CRC job")
                 );
 
                 q.AddTrigger(t => t
                     .WithIdentity("Simple Trigger")
-                    .ForJob(jobKey)
-                    .ForJob(crcJobKey)  // CRC
+                    //.ForJob(jobKey)
+                    .ForJob(crcJobKey)
                     .StartNow()
                     .WithSimpleSchedule(x => x.WithInterval(TimeSpan.FromSeconds(10)).RepeatForever())
-                    .WithDescription("my awesome simple trigger")
+                    .WithDescription("Simple trigger with interval of 10 seconds repeating forever")
                 );
-                //q.AddTrigger(t => t
-                //    .WithIdentity("Simple Trigger")
-                //    .ForJob(crcJobKey)
-                //    .StartNow()
-                //    .WithSimpleSchedule(x => x.WithInterval(TimeSpan.FromSeconds(10)).RepeatForever())
-                //    .WithDescription("my awesome simple trigger")
-                //);
 
-                q.AddTrigger(t => t
-                    .WithIdentity("Cron Trigger")
-                    .ForJob(jobKey)
-                    .ForJob(crcJobKey)  // CRC
-                    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(3)))
-                    .WithCronSchedule("0/3 * * * * ?")
-                    .WithDescription("my awesome cron trigger")
-                );
+                //q.AddTrigger(t => t
+                //    .WithIdentity("Cron Trigger")
+                //    //.ForJob(jobKey)
+                //    .ForJob(crcJobKey)  
+                //    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(3)))
+                //    .WithCronSchedule("0/3 * * * * ?")
+                //    .WithDescription("my awesome cron trigger")
+                //);
 
                 //q.ScheduleJob<SlowJob>(
                 //    triggerConfigurator => triggerConfigurator
@@ -211,21 +217,21 @@ namespace Quartz.Examples.AspNetCore
                 //    x => x.AddExcludedDate(new DateTime(2020, 5, 15))
                 //);
 
-                q.AddTrigger(t => t
-                    .WithIdentity("Daily Trigger")
-                    .ForJob(jobKey)
-                    .ForJob(crcJobKey)
-                    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(5)))
-                    .WithDailyTimeIntervalSchedule(x => x.WithInterval(10, IntervalUnit.Second))
-                    .WithDescription("my awesome daily time interval trigger")
-                //.ModifiedByCalendar(calendarName)
-                );
+                //q.AddTrigger(t => t
+                //    .WithIdentity("Daily Trigger")
+                //    //.ForJob(jobKey)
+                //    .ForJob(crcJobKey)
+                //    .StartAt(DateBuilder.EvenSecondDate(DateTimeOffset.UtcNow.AddSeconds(5)))
+                //    .WithDailyTimeIntervalSchedule(x => x.WithInterval(10, IntervalUnit.Second))
+                //    .WithDescription("my awesome daily time interval trigger")
+                ////.ModifiedByCalendar(calendarName)
+                //);
                 #endregion
 
                 // add some listeners
                 q.AddSchedulerListener<SampleSchedulerListener>();
                 //q.AddJobListener<SampleJobListener>(GroupMatcher<JobKey>.GroupEquals(jobKey.Group));
-                q.AddJobListener<SampleJobListener>(GroupMatcher<JobKey>.GroupEquals(crcJobKey.Group));
+                //q.AddJobListener<SampleJobListener>(GroupMatcher<JobKey>.GroupEquals(crcJobKey.Group));
                 q.AddTriggerListener<SampleTriggerListener>();
 
                 // example of persistent job store using JSON serializer as an example
@@ -286,14 +292,12 @@ namespace Quartz.Examples.AspNetCore
             {
                 // when shutting down we want jobs to complete gracefully
                 options.WaitForJobsToComplete = true;
+                options.AwaitApplicationStarted = true;
             });
 
             services
                 .AddHealthChecksUI()
                 .AddInMemoryStorage();
-
-            
-
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

@@ -1,4 +1,4 @@
-namespace Quartz.Examples.AspNetCore.CRC_API.Models
+namespace Quartz.Examples.AspNetCore.CRC_API.DTO
 {
     public class EmployeeDTO
     {
@@ -16,7 +16,7 @@ namespace Quartz.Examples.AspNetCore.CRC_API.Models
 
         public string? CurrentDepartmentID { get; set; }
 
-        public IEnumerable<ExtraFieldDTO>? ExtraFields { get; set; }
+        public List<ExtraFieldDTO>? ExtraFields { get; set; }
     }
 
     public class ExtraFieldDTO

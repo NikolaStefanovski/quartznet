@@ -1,40 +1,67 @@
+using AutoMapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Quartz.Examples.AspNetCore.Database;
+using Quartz.Examples.AspNetCore.Database.Models;
 using Quartz.Examples.AspNetCore.CRC_API;
-using Quartz.Examples.AspNetCore.CRC_API.Models;
 
 namespace Quartz.Examples.AspNetCore
 {
+    [DisallowConcurrentExecution]
     public class CRCJob : IJob, IDisposable
     {
-        private readonly ILogger<ExampleJob> Logger;
+        private readonly ILogger Logger;
         private readonly CRCAPI API;
-        private readonly DbContext DBContext;
+        private readonly CRCTestContext DBContext;
+        private readonly IMapper Mapper;
 
-        public CRCJob(ILogger<ExampleJob> logger, CRCAPI api, DbContext dbContext)
+        public CRCJob(ILogger<CRCJob> logger, CRCAPI api, CRCTestContext dbContext, IMapper mapper)
         {
             this.Logger = logger;
             this.API = api;
             this.DBContext = dbContext;
+            this.Mapper = mapper;
         }
 
         public async Task Execute(IJobExecutionContext context)
         {
-            var result = API.GetEmployees();
+            Logger.LogInformation(context.JobDetail.Key + " job executing, triggered by " + context.Trigger.Key);
 
-            if (result != null && result.Value != null)
+            // get employees
+            var employeesResult = API.GetEmployees();
+
+            if (employeesResult != null && employeesResult.Value != null)
             {
-                foreach (var employee in result.Value)
-                {
+                DBContext.EmployeeExtraFields.RemoveRange(DBContext.EmployeeExtraFields);
+                DBContext.Employees.RemoveRange(DBContext.Employees);
+                DBContext.SaveChanges();
 
-                    DBContext.Add(employee);
+                foreach (var employee in employeesResult.Value)
+                {
+                    DBContext.Employees.Add(Mapper.Map<Employee>(employee));
+                }
+
+                DBContext.SaveChanges();
+            }
+
+            // get employees
+            var employeesPresenceResult = API.GetEmployeePresences();
+
+            if (employeesPresenceResult != null && employeesPresenceResult.Value != null)
+            {
+                DBContext.EmployeePresences.RemoveRange(DBContext.EmployeePresences);
+                DBContext.SaveChanges();
+
+                foreach (var employeePresence in employeesPresenceResult.Value)
+                {
+                    DBContext.EmployeePresences.Add(Mapper.Map<EmployeePresence>(employeePresence));
                 }
 
                 DBContext.SaveChanges();
             }
 
             Logger.LogInformation("CRC job executed");
-            await Task.Yield();
+            await Task.Delay(TimeSpan.FromSeconds(10));
         }
 
         public void Dispose()

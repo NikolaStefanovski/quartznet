@@ -1,6 +1,6 @@
 using AutoMapper;
-using Quartz.Examples.AspNetCore.CRC_API.Models;
-using Quartz.Examples.AspNetCore.DBModels;
+using Quartz.Examples.AspNetCore.CRC_API.DTO;
+using Quartz.Examples.AspNetCore.Database.Models;
 
 namespace Quartz.Examples.AspNetCore.Mappers
 {
@@ -8,9 +8,12 @@ namespace Quartz.Examples.AspNetCore.Mappers
     {
         public EmployeeProfile()
         {
-            CreateMap<EmployeeDTO, Employee>().ReverseMap();
-
             CreateMap<ExtraFieldDTO, EmployeeExtraField>().ReverseMap();
+            CreateMap<EmployeeDTO, Employee>()
+                .ForMember(dest => dest.EmployeeExtraFields, mapper => mapper.MapFrom(source => source.ExtraFields))
+                .ReverseMap();
+            CreateMap<EmployeePresenceDTO, EmployeePresence>().ReverseMap();
+
         }
     }
 }
